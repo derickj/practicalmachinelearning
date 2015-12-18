@@ -5,11 +5,11 @@ date: "18 December 2015"
 output: html_document
 ---
 
-### Executive Summary
+## Executive Summary
 
 
 
-### Exploratory Analysis
+## Exploratory Analysis
 
 ```{r loadlibs}
 library(caret)
@@ -23,53 +23,45 @@ The same transformations were performed to the test data set in order to ensure 
 
 ```{r loadandread}
 trainfile <- "pml-training.csv"
-# download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",trainfile)
 if(!file.exists(trainfile)) {
-    msg <- paste(trainfile, "does not exist", sep=" ")
-    stop(msg)
+    download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",trainfile)    
 }
 training <- read.csv(trainfile,stringsAsFactors=FALSE,na.strings=c("NA","","#DIV/0"))
 training$classe <- as.factor(training$classe)
 
 testfile <- "pml-testing.csv"
-# download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",testfile)
 if(!file.exists(testfile)) {
-    msg <- paste(testfile, "does not exist", sep=" ")
-    stop(msg)
+    download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",testfile)
 }
 testing <- read.csv(testfile,stringsAsFactors=FALSE,na.strings=c("NA","","#DIV/0"))
-# Drop the problem_id column as well as the columns not useful to the prediction
-testing <- testing[,8:159]
 
 # Drop the initial columns not useful to the prediction
 training <- training[,8:160]
+testing <- testing[,8:159] # For testing the problem id column at the end is also dropped
 cutoff <- 0.9*nrow(training)
 selcols <- which(colSums(is.na(training)) < cutoff)
 training <- training[, selcols]
 testing <- testing[, selcols[1:(length(selcols)-1)]]
-
-# coltypes<-sapply(training,class)
-# charindex<-coltypes=="character"
-# for (i in 1:(ncol(training)-1)) {if (charindex[i]==TRUE) {training[,i]<-as.numeric(training[,i]) }}
-
 ```
-### Data splitting and preprocessing
+
+## Data splitting and preprocessing
+
+The training data set is split into a training and a test (validation) data set, with 70% observations allocated to training and the rest to the validation set.  All model development is done using the training data only, and then validated against the 30% test data.
+
+The supplied test data set is only used in the final prediction to be submitted as part of the project.
 
 ```{r splitandprocess}
 set.seed(8668)
 intrain <- createDataPartition(y = training$classe, p = 0.7, list = FALSE)
 mytrain <- training[intrain, ]
 mytest <- training[-intrain, ]
-# preobj<-preProcess(mytrain[,-53],method="pca",thresh=0.8)
-
 ```
 
-### Alternative prediction models
+## Alternative prediction models
 
-#### Decision tree
+### Decision tree
 
-```{ r cart}
-controlopts <- trainControl(method = "cv", number = 10)
+```{r decisiontree}
 modfit1 <- train (classe ~ ., method="rpart", data = mytrain)
 fancyRpartPlot(modfit1$finalModel)
 testpredict <- predict(modfit1, newdata = mytest[,-53])
@@ -80,13 +72,19 @@ The classification tree did not result in a very good prediction, less than 50% 
 
 ### Generalized Boosted Regression Model
 
+Next, we fit a generalized boosted regression model.
+
 ``` {r gbm, cache = TRUE}
 modfit2 <- train (classe ~ ., method="gbm", data = mytrain, verbose = FALSE)
 testpredict <- predict(modfit2, newdata = mytest[,-53])
 confusionMatrix(testpredict,mytest$classe)
 ```
 
-#### Random Forest
+The GBM provides much improved accuracy over the classification and regression tree.
+
+### Random Forest
+
+Finally, the random forest method is used on the training data to build a third model.
 
 ``` {r randomforest, cache = TRUE}
 modfit3 <- train (classe ~ ., method="rf", data = mytrain)
@@ -94,12 +92,13 @@ testpredict <- predict(modfit3, newdata = mytest[,-53])
 confusionMatrix(testpredict,mytest$classe)
 ```
 
+## Conclusion
 
-### Conclusion
+The accuracy of the random forest prediction when applied to the validation data set is the best of the alternative models developed.
 
-### Out of Sample Error
+## Out of Sample Error
 
-### Predict test cases 
+## Predict test cases 
 
 ```{r testcases}
 pml_write_files = function(x){
@@ -116,6 +115,6 @@ answers <- predict(modfit3, newdata = testing)
 pml_write_files(answers)
 ```
 
-### References
+## References
 
 [UGUL2012] Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6. 
